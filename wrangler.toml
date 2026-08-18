@@ -2,10 +2,15 @@ name = "font-changer-seo"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
 
+# Serve static assets from public/ directory
+[site]
+bucket = "public"
+entry-point = "src/worker.js"
+
 # Global environment variables
 [vars]
 APP_ENV = "production"
-BASE_URL = "https://font-changer.example.com"
+BASE_URL = "https://font-changer-seo.sachin-123-ss92.workers.dev"
 
 # D1 Database Binding
 [[d1_databases]]

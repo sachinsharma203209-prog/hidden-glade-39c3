@@ -32,6 +32,22 @@ export default {
       return new Response('Method Not Allowed', { status: 405, headers: { 'Allow': 'GET, HEAD' } });
     }
 
+    // ── Serve client-side JS assets ───────────────────────────────
+    if (path === 'font-changer-engine.js') {
+      const engineJs = await loadAsset('font-changer-engine.js');
+      return new Response(engineJs, {
+        status: 200,
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
+    if (path === 'font-changer-tool.js') {
+      const toolJs = await loadAsset('font-changer-tool.js');
+      return new Response(toolJs, {
+        status: 200,
+        headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
+
     // ── Robots.txt ──────────────────────────────────────────────
     if (path === '/robots.txt') {
       return robotsTxtResponse(env);
