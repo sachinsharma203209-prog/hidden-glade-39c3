@@ -25,12 +25,15 @@ export function escapeSlug(str) {
     .replace(/^-|-$/g, '');
 }
 
-/** Normalize a URL path: lowercase, dedup slashes, strip trailing slash. */
+/** Normalize a URL path: lowercase, dedup slashes, strip leading/trailing slash. */
 export function normalizePath(path) {
   if (!path) return '';
   let p = path.toLowerCase();
   while (p.includes('//')) p = p.replace(/\/\//g, '/');
-  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  // Strip leading slash
+  if (p.startsWith('/')) p = p.slice(1);
+  // Strip trailing slash unless it's the root
+  if (p.length > 0 && p.endsWith('/')) p = p.slice(0, -1);
   return p;
 }
 
