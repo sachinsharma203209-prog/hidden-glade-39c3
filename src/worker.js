@@ -38,6 +38,7 @@ export default {
     const url = new URL(request.url);
     const path = normalizePath(url.pathname);
     const method = request.method;
+    const baseUrl = (env.BASE_URL || 'https://font-changer.example.com').replace(/\/+$/, '');
 
     // Only GET and HEAD are handled
     if (method !== 'GET' && method !== 'HEAD') {
@@ -64,7 +65,7 @@ export default {
 
     // ── Root redirect ───────────────────────────────────────────
     if (path === '' || path === '/') {
-      const target = canonicalUrl('font-changer');
+      const target = canonicalUrl(baseUrl, 'font-changer');
       return new Response(null, {
         status: 301,
         headers: { Location: target },
