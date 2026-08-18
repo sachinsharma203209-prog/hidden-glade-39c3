@@ -5,7 +5,6 @@ compatibility_date = "2025-01-01"
 # Serve static assets from public/ directory
 [site]
 bucket = "public"
-entry-point = "src/worker.js"
 
 # Global environment variables
 [vars]
