@@ -2,13 +2,16 @@ name = "font-changer-seo"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
 
+# Global environment variables
+[vars]
+APP_ENV = "production"
+BASE_URL = "https://font-changer.example.com"
+
 # D1 Database Binding
-# Create first: wrangler d1 create font-changer-db
-# Then replace database_id with the actual D1 ID
 [[d1_databases]]
 binding = "FONT_CHANGER_DB"
 database_name = "font-changer-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "16ad4ada-8fa9-403c-bc2c-b612ae92ba2f"
 
 # Production environment
 [env.production]
