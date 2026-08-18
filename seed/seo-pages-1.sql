@@ -18,7 +18,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
 -- ============================================
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 1, 'font-changer/instagram', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='instagram'), 'font-changer/instagram', 'attribute',
  'Font Changer for Instagram - Stylish Text Generator',
  'Create stylish Unicode text for Instagram bios, captions, comments, and profiles. Copy fancy fonts for Instagram instantly.',
  'Font Changer for Instagram',
@@ -26,7 +26,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 2, 'font-changer/facebook', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='facebook'), 'font-changer/facebook', 'attribute',
  'Font Changer for Facebook - Stylish Text for Posts',
  'Generate fancy and bold text for Facebook posts, comments, bio, and profile. Copy and paste custom text styles on Facebook.',
  'Font Changer for Facebook',
@@ -34,7 +34,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 3, 'font-changer/whatsapp', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='whatsapp'), 'font-changer/whatsapp', 'attribute',
  'Font Changer for WhatsApp - Fancy Status & Message Text',
  'Create stylish text for WhatsApp statuses, messages, and display names. Copy and paste fancy fonts on WhatsApp easily.',
  'Font Changer for WhatsApp',
