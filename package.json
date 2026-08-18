@@ -1,0 +1,20 @@
+{
+  "name": "font-changer-seo",
+  "version": "1.0.0",
+  "description": "Font Changer Entity SEO Platform — Cloudflare Workers + D1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute font-changer-db --file=migrations/0001_entities.sql",
+    "db:migrate": "npx wrangler d1 execute font-changer-db --file=migrations/0002_attributes.sql && npx wrangler d1 execute font-changer-db --file=migrations/0003_keywords.sql && npx wrangler d1 execute font-changer-db --file=migrations/0004_seo_pages.sql && npx wrangler d1 execute font-changer-db --file=migrations/0005_faqs.sql && npx wrangler d1 execute font-changer-db --file=migrations/0006_redirects.sql",
+    "db:seed": "npx wrangler d1 execute font-changer-db --file=seed/font-changer.sql",
+    "db:setup": "npm run db:init && npm run db:migrate && npm run db:seed"
+  },
+  "devDependencies": {
+    "@types/cloudflare-workers": "^2.2.0",
+    "wrangler": "^3.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {}
+}
