@@ -1,7 +1,9 @@
--- SEO Pages seed part 6: Use case pages (attribute_ids 51-60)
+-- SEO Pages seed part 6: Use case pages
+-- Attribute IDs are resolved dynamically from the attributes table.
+-- Run after attributes have been seeded.
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 51, 'font-changer/username', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='username'), 'font-changer/username', 'attribute',
  'Stylish Username Generator - Font Changer for Unique Names',
  'Generate stylish and unique usernames with the Font Changer. Create bold, fancy, cursive, and cool text for your social media and gaming usernames for free.',
  'Stylish Username Generator',
@@ -9,7 +11,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 52, 'font-changer/nickname', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='nickname'), 'font-changer/nickname', 'attribute',
  'Fancy Nickname Generator - Font Changer for Cool Nicknames',
  'Generate fancy and cool nicknames with the Font Changer. Create bold, cursive, and stylish text for your nicknames on any platform, for free.',
  'Fancy Nickname Generator',
@@ -17,7 +19,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 53, 'font-changer/bio', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='bio'), 'font-changer/bio', 'attribute',
  'Instagram & Social Media Bio Font Generator - Font Changer',
  'Generate stylish font text for bios on Instagram, WhatsApp, Discord, and other platforms. Create bold, fancy, and cool bio text with the Font Changer for free.',
  'Bio Font Generator',
@@ -25,7 +27,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 54, 'font-changer/caption', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='caption'), 'font-changer/caption', 'attribute',
  'Social Media Caption Font Generator - Font Changer for Posts',
  'Generate stylish caption text for social media posts. Create bold, fancy, and cool captions for Instagram, Facebook, and other platforms for free.',
  'Caption Font Generator',
@@ -33,7 +35,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 55, 'font-changer/status', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='status'), 'font-changer/status', 'attribute',
  'Status Font Generator - Font Changer for WhatsApp & Discord Status',
  'Generate stylish status text for WhatsApp, Discord, and other platforms. Create bold, fancy, and cool status text with the Font Changer for free.',
  'Status Font Generator',
@@ -41,7 +43,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 56, 'font-changer/comment', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='comment'), 'font-changer/comment', 'attribute',
  'Stylish Comment Font Generator - Font Changer for Comments',
  'Generate stylish comment text for YouTube, Instagram, Facebook, and other platforms. Create bold, fancy, and cool comment text with the Font Changer for free.',
  'Comment Font Generator',
@@ -49,7 +51,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 57, 'font-changer/gaming-name', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='gaming-name'), 'font-changer/gaming-name', 'attribute',
  'Gaming Name Font Generator - Font Changer for Gamertags',
  'Generate stylish gaming names and gamertags with the Font Changer. Create bold, fancy, cursive, and cool Unicode names for any game for free.',
  'Gaming Name Font Generator',
@@ -57,7 +59,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 58, 'font-changer/profile-name', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='profile-name'), 'font-changer/profile-name', 'attribute',
  'Stylish Profile Name Generator - Font Changer for Profiles',
  'Generate stylish profile names for social media, gaming, and messaging apps. Create bold, fancy, and cool profile names with the Font Changer for free.',
  'Profile Name Generator',
@@ -65,7 +67,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 59, 'font-changer/post', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='post'), 'font-changer/post', 'attribute',
  'Social Media Post Font Generator - Font Changer for Posts',
  'Generate stylish text for social media posts. Create bold, fancy, cursive, and cool Unicode text for Instagram, Facebook, Twitter, and other platforms for free.',
  'Post Font Generator',
@@ -73,7 +75,7 @@ INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title
  1, 'index,follow', 'published');
 
 INSERT OR IGNORE INTO seo_pages (entity_id, attribute_id, slug, page_type, title, meta_description, h1, intro, indexable, robots, status) VALUES
-(1, 60, 'font-changer/clan-name', 'attribute',
+(1, (SELECT id FROM attributes WHERE slug='clan-name'), 'font-changer/clan-name', 'attribute',
  'Fancy Clan Name Generator - Font Changer for Guild & Clan Names',
  'Generate fancy and stylish clan names for PUBG, Free Fire, Discord, and other gaming communities. Create bold and cool Unicode clan names for free.',
  'Clan Name Generator',
