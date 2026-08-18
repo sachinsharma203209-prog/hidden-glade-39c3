@@ -50,8 +50,9 @@ export default {
       return robotsTxtResponse(env);
     }
 
-    // ── Sitemap.xml ─────────────────────────────────────────────
-    if (path === '/sitemap.xml' || path === '/sitemap') {
+    // ── Sitemap.xml (check BEFORE normalizePath strips leading slash)
+    // path looks like '/sitemap.xml' before normalization strips the slash
+    if (url.pathname === '/sitemap.xml' || url.pathname === '/sitemap' || url.pathname === '/sitemap.xml/') {
       return sitemapResponse(env);
     }
 
