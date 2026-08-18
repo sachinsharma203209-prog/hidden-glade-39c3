@@ -17,19 +17,6 @@
 import { escapeHtml, normalizePath, canonicalUrl, buildBreadcrumbs, breadcrumbJsonLd, webAppJsonLd, webPageJsonLd, faqJsonLd } from './utils/helpers.js';
 
 // ─────────────────────────────────────────────────────────────────
-// ROUTING TABLE
-// ─────────────────────────────────────────────────────────────────
-// Routes are resolved from D1, not hardcoded.
-// The expected URL patterns:
-//   /font-changer                    → core seo_pages slug = 'font-changer'
-//   /font-changer/{slug}            → seo_pages slug = 'font-changer/{slug}'
-//
-// Any path not matching a published, indexable (or valid) seo_pages record
-// returns 404.
-
-const ROUTE_PREFIX = '/font-changer';
-
-// ─────────────────────────────────────────────────────────────────
 // MAIN FETCH HANDLER
 // ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +116,7 @@ export default {
 
     // ── Page not found ──────────────────────────────────────────
     if (!page) {
-      const notFoundHtml = renderNotFound(path, env);
+      const notFoundHtml = renderNotFound(path, baseUrl);
       return new Response(notFoundHtml, {
         status: 404,
         headers: {
@@ -150,12 +137,10 @@ export default {
     `).bind(page.id).all();
 
     // ── Fetch related pages ─────────────────────────────────────
-    // Related pages = same entity, other attributes from related groups,
-    // plus the core page. Excludes current page.
     const relatedPages = await getRelatedPages(db, page);
 
     // ── Render the page ─────────────────────────────────────────
-    const html = renderSeoPage(page, faqs.results || [], relatedPages, env);
+    const html = renderSeoPage(page, faqs.results || [], relatedPages, baseUrl);
 
     // ── Response headers ────────────────────────────────────────
     const robotsValue = page.robots || 'index,follow';
@@ -164,7 +149,7 @@ export default {
     const headers = {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': isIndexable
-        ? 'public, max-age=300, s-maxage=600'   // 5 min CDN, 10 min edge
+        ? 'public, max-age=300, s-maxage=600'
         : 'no-cache, no-store',
       'Vary': 'Accept-Encoding',
       'X-Robots-Tag': robotsValue,
@@ -173,7 +158,7 @@ export default {
     // Add canonical if not set in DB
     let canonical = page.canonical_url;
     if (!canonical) {
-      canonical = canonicalUrl(page.slug);
+      canonical = canonicalUrl(baseUrl, page.slug);
     }
     headers['Link'] = `<${canonical}>; rel="canonical"`;
 
@@ -184,14 +169,9 @@ export default {
 // ─────────────────────────────────────────────────────────────────
 // RELATED PAGES QUERY
 // ─────────────────────────────────────────────────────────────────
-// Get topically relevant pages for internal linking:
-//  1. The core font-changer page
-//  2. Other attributes from the same entity, preferring same group
-//  3. Limited to a reasonable count
 async function getRelatedPages(db, currentPage) {
   const results = [];
 
-  // 1. Always include the core page (if not current)
   if (currentPage.slug !== 'font-changer') {
     const core = await db.prepare(`
       SELECT id, slug, title, h1, intro
@@ -202,7 +182,6 @@ async function getRelatedPages(db, currentPage) {
     if (core) results.push(core);
   }
 
-  // 2. Same entity, same group, different attribute
   const sameGroup = await db.prepare(`
     SELECT DISTINCT sp.id, sp.slug, sp.title, sp.h1, sp.intro
     FROM seo_pages sp
@@ -219,7 +198,6 @@ async function getRelatedPages(db, currentPage) {
 
   results.push(...(sameGroup.results || []));
 
-  // 3. Same entity, different group (fill up to 12 total)
   if (results.length < 12) {
     const otherGroup = await db.prepare(`
       SELECT DISTINCT sp.id, sp.slug, sp.title, sp.h1, sp.intro
@@ -277,7 +255,6 @@ async function sitemapResponse(env) {
   const db = env.FONT_CHANGER_DB;
   const base = (env.BASE_URL || 'https://font-changer.example.com').replace(/\/+$/, '');
 
-  // Only published + indexable pages
   const pages = await db.prepare(`
     SELECT slug, updated_at
     FROM seo_pages
@@ -304,9 +281,6 @@ async function sitemapResponse(env) {
   });
 }
 
-/**
- * Minimal XML escaping (only for sitemap output).
- */
 function escapeXml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -319,29 +293,26 @@ function escapeXml(str) {
 // ─────────────────────────────────────────────────────────────────
 // RENDER: SEO PAGE
 // ─────────────────────────────────────────────────────────────────
-function renderSeoPage(page, faqs, relatedPages, env) {
-  const base = (env.BASE_URL || 'https://font-changer.example.com').replace(/\/+$/, '');
+function renderSeoPage(page, faqs, relatedPages, baseUrl) {
   const isIndexable = page.indexable === 1;
-  const canonical = page.canonical_url || canonicalUrl(page.slug);
+  const canonical = page.canonical_url || canonicalUrl(baseUrl, page.slug);
   const robotsValue = page.robots || (isIndexable ? 'index,follow' : 'noindex,follow');
 
-  // Breadcrumbs
-  const crumbs = buildBreadcrumbs(page.entity_name ? { slug: page.entity_slug, name: page.entity_name } : null,
-                                    page.attribute_name ? { slug: page.attribute_slug, name: page.attribute_name } : null);
+  const crumbs = buildBreadcrumbs(
+    page.entity_name ? { slug: page.entity_slug, name: page.entity_name } : null,
+    page.attribute_name ? { slug: page.attribute_slug, name: page.attribute_name } : null
+  );
 
-  // JSON-LD
   const breadcrumbLd = breadcrumbJsonLd(crumbs);
-  const webAppLd = webAppJsonLd(base);
+  const webAppLd = webAppJsonLd(baseUrl);
   const webPageLd = webPageJsonLd(page.title, page.meta_description || '', canonical);
   const faqLd = faqJsonLd(faqs);
 
-  // Related pages HTML
   const relatedHtml = relatedPages.map(rp => {
-    const rpCanonical = rp.canonical_url || canonicalUrl(rp.slug);
+    const rpCanonical = rp.canonical_url || canonicalUrl(baseUrl, rp.slug);
     return '<a href="' + escapeHtml(rpCanonical) + '" class="related-page-link">' + escapeHtml(rp.title) + '</a>';
   }).join('\n');
 
-  // FAQ HTML
   const faqHtml = faqs.map(f => {
     return '<div class="faq-item">' +
       '<h3 class="faq-question">' + escapeHtml(f.question) + '</h3>' +
@@ -349,7 +320,6 @@ function renderSeoPage(page, faqs, relatedPages, env) {
     '</div>';
   }).join('\n');
 
-  // Group info (if attribute)
   const groupInfoHtml = page.group_name ? `
     <section class="attribute-info-section">
       <h2>About ${escapeHtml(page.group_name)}</h2>
@@ -357,7 +327,6 @@ function renderSeoPage(page, faqs, relatedPages, env) {
     </section>
   ` : '';
 
-  // Entity description
   const entityDescHtml = page.entity_description ? `
     <p class="entity-description">${escapeHtml(page.entity_description)}</p>
   ` : '';
@@ -384,20 +353,19 @@ function renderSeoPage(page, faqs, relatedPages, env) {
   <header class="site-header">
     <nav class="site-nav" aria-label="Primary">
       <div class="nav-container">
-        <a href="${escapeHtml(canonicalUrl('font-changer'))}" class="brand">Font Changer</a>
+        <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer'))}" class="brand">Font Changer</a>
         <div class="nav-links">
-          <a href="${escapeHtml(canonicalUrl('font-changer/instagram'))}">Instagram</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/facebook'))}">Facebook</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/whatsapp'))}">WhatsApp</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/hindi'))}">Hindi</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/bold'))}">Bold</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/instagram'))}">Instagram</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/facebook'))}">Facebook</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/whatsapp'))}">WhatsApp</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/hindi'))}">Hindi</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/bold'))}">Bold</a>
         </div>
       </div>
     </nav>
   </header>
 
   <main class="site-main">
-    <!-- Breadcrumb -->
     <nav aria-label="Breadcrumb" class="breadcrumb-nav">
       <ol class="breadcrumb-list">
         ${crumbs.map((c, i) => `
@@ -412,7 +380,6 @@ function renderSeoPage(page, faqs, relatedPages, env) {
       </ol>
     </nav>
 
-    <!-- H1 + Intro -->
     <article class="seo-article">
       <header class="article-header">
         <h1 class="article-h1">${escapeHtml(page.h1 || page.title)}</h1>
@@ -420,12 +387,10 @@ function renderSeoPage(page, faqs, relatedPages, env) {
         ${page.intro ? '<p class="article-intro">' + escapeHtml(page.intro) + '</p>' : ''}
       </header>
 
-      <!-- Font Changer Tool (reusable, same on every page) -->
       <section class="font-changer-tool-section" aria-label="Font Changer Tool">
         ${fontChangerToolHtml()}
       </section>
 
-      <!-- How the tool works -->
       <section class="how-it-works-section">
         <h2>How the Font Changer Works</h2>
         <p>Type or paste any text into the input box above. The tool instantly generates all available Unicode font styles below. Each style has a <strong>Copy</strong> button — tap it to copy that style to your clipboard. You can also press <strong>Copy All</strong> to copy every style at once, separated by lines.</p>
@@ -435,7 +400,6 @@ function renderSeoPage(page, faqs, relatedPages, env) {
         ` : ''}
       </section>
 
-      <!-- Use cases -->
       <section class="use-cases-section">
         <h2>Common Use Cases</h2>
         <div class="use-cases-grid">
@@ -443,10 +407,8 @@ function renderSeoPage(page, faqs, relatedPages, env) {
         </div>
       </section>
 
-      <!-- Attribute-specific info -->
       ${groupInfoHtml}
 
-      <!-- Examples section -->
       <section class="examples-section">
         <h2>Styled Text Examples</h2>
         <div class="examples-grid">
@@ -454,7 +416,6 @@ function renderSeoPage(page, faqs, relatedPages, env) {
         </div>
       </section>
 
-      <!-- FAQ -->
       ${faqs.length > 0 ? `
       <section class="faq-section">
         <h2>Frequently Asked Questions</h2>
@@ -464,22 +425,20 @@ function renderSeoPage(page, faqs, relatedPages, env) {
       </section>
       ` : ''}
 
-      <!-- Related Tools -->
       <section class="related-section">
         <h2>Related Font Tools</h2>
         <div class="related-links">
-          <a href="${escapeHtml(canonicalUrl('font-changer/instagram'))}">Font Changer for Instagram</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/facebook'))}">Font Changer for Facebook</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/whatsapp'))}">Font Changer for WhatsApp</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/twitter'))}">Font Changer for Twitter / X</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/hindi'))}">Hindi Font Changer</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/bold'))}">Bold Font Changer</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/cursive'))}">Cursive Font Changer</a>
-          <a href="${escapeHtml(canonicalUrl('font-changer/fancy'))}">Fancy Font Changer</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/instagram'))}">Font Changer for Instagram</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/facebook'))}">Font Changer for Facebook</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/whatsapp'))}">Font Changer for WhatsApp</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/twitter'))}">Font Changer for Twitter / X</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/hindi'))}">Hindi Font Changer</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/bold'))}">Bold Font Changer</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/cursive'))}">Cursive Font Changer</a>
+          <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/fancy'))}">Fancy Font Changer</a>
         </div>
       </section>
 
-      <!-- Related Pages (from D1) -->
       ${relatedHtml ? `
       <section class="related-pages-section">
         <h2>More Font Changer Pages</h2>
@@ -495,17 +454,16 @@ function renderSeoPage(page, faqs, relatedPages, env) {
     <div class="footer-container">
       <p>&copy; 2026 Font Changer. All font styles are generated using Unicode characters — not downloadable font files.</p>
       <nav class="footer-nav">
-        <a href="${escapeHtml(canonicalUrl('font-changer'))}">Font Changer Home</a>
-        <a href="${escapeHtml(canonicalUrl('font-changer/instagram'))}">Instagram Font</a>
-        <a href="${escapeHtml(canonicalUrl('font-changer/facebook'))}">Facebook Font</a>
-        <a href="${escapeHtml(canonicalUrl('font-changer/whatsapp'))}">WhatsApp Font</a>
+        <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer'))}">Font Changer Home</a>
+        <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/instagram'))}">Instagram Font</a>
+        <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/facebook'))}">Facebook Font</a>
+        <a href="${escapeHtml(canonicalUrl(baseUrl, 'font-changer/whatsapp'))}">WhatsApp Font</a>
       </nav>
     </div>
   </footer>
 
-  <!-- Reusable Font Changer Tool Scripts -->
-  <script src="${escapeHtml(base + '/font-changer-engine.js')}"></script>
-  <script src="${escapeHtml(base + '/font-changer-tool.js')}"></script>
+  <script src="${escapeHtml(baseUrl + '/font-changer-engine.js')}"></script>
+  <script src="${escapeHtml(baseUrl + '/font-changer-tool.js')}"></script>
 </body>
 </html>`;
 
@@ -515,9 +473,8 @@ function renderSeoPage(page, faqs, relatedPages, env) {
 // ─────────────────────────────────────────────────────────────────
 // RENDER: NOT FOUND (404)
 // ─────────────────────────────────────────────────────────────────
-function renderNotFound(requestedPath, env) {
-  const base = (env.BASE_URL || 'https://font-changer.example.com').replace(/\/+$/, '');
-  const canonicalBase = canonicalUrl('font-changer');
+function renderNotFound(requestedPath, baseUrl) {
+  const canonicalBase = canonicalUrl(baseUrl, 'font-changer');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -555,7 +512,7 @@ function renderNotFound(requestedPath, env) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//_FONT CHANGER TOOL HTML (REUSABLE)
+// FONT CHANGER TOOL HTML (REUSABLE)
 // ─────────────────────────────────────────────────────────────────
 function fontChangerToolHtml() {
   return `
@@ -600,9 +557,6 @@ function fontChangerToolHtml() {
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────────
-// USE CASES GRID
-// ─────────────────────────────────────────────────────────────────
 function useCasesGridHtml() {
   const useCases = [
     { label: 'Username', desc: 'Stylish usernames for social media, gaming, and profiles.' },
@@ -628,9 +582,6 @@ function useCasesGridHtml() {
   `).join('\n');
 }
 
-// ─────────────────────────────────────────────────────────────────
-// EXAMPLES GRID
-// ─────────────────────────────────────────────────────────────────
 function examplesGridHtml(attributeName) {
   const examples = [
     'Font Changer',
@@ -642,17 +593,12 @@ function examplesGridHtml(attributeName) {
   ];
 
   const prefix = attributeName ? attributeName + ' ' : '';
-  const items = examples.map(ex => {
-    const styled = ex;
-    return `
+  return examples.map(ex => `
       <div class="example-card">
         <div class="example-label">${prefix}${ex}</div>
-        <div class="example-styled">${styled}</div>
+        <div class="example-styled">${ex}</div>
       </div>
-    `;
-  }).join('\n');
-
-  return items;
+    `).join('\n');
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -673,14 +619,12 @@ function cssStyles() {
   --color-text-secondary: #a89bb5;
   --color-text-muted: #7a6d94;
   --color-border: #3d3566;
-  --color-white: #ffffff;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Courier New', monospace;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --shadow-card: 0 2px 12px rgba(0,0,0,0.4);
-  --shadow-glow: 0 0 20px rgba(0,212,170,0.15);
 }
 
 html { font-size: 16px; scroll-behavior: smooth; }
@@ -694,7 +638,6 @@ body {
   display: flex;
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ===== Header ===== */
@@ -706,11 +649,7 @@ body {
   z-index: 100;
 }
 
-.site-nav {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
+.site-nav { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 
 .nav-container {
   max-width: 1200px;
@@ -729,11 +668,7 @@ body {
   letter-spacing: -0.01em;
 }
 
-.nav-links {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+.nav-links { display: flex; gap: 16px; flex-wrap: wrap; }
 
 .nav-links a {
   color: var(--color-text-secondary);
@@ -745,17 +680,10 @@ body {
   transition: color 0.15s, background 0.15s;
 }
 
-.nav-links a:hover {
-  color: var(--color-primary);
-  background: rgba(0,212,170,0.08);
-}
+.nav-links a:hover { color: var(--color-primary); background: rgba(0,212,170,0.08); }
 
 /* ===== Breadcrumbs ===== */
-.breadcrumb-nav {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px 20px 0;
-}
+.breadcrumb-nav { max-width: 1200px; margin: 0 auto; padding: 16px 20px 0; }
 
 .breadcrumb-list {
   display: flex;
@@ -765,31 +693,13 @@ body {
   gap: 4px;
 }
 
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.8125rem;
-}
+.breadcrumb-item { display: flex; align-items: center; gap: 4px; font-size: 0.8125rem; }
 
-.breadcrumb-item a {
-  color: var(--color-text-secondary);
-  text-decoration: none;
-}
+.breadcrumb-item a { color: var(--color-text-secondary); text-decoration: none; }
+.breadcrumb-item a:hover { color: var(--color-primary); }
 
-.breadcrumb-item a:hover {
-  color: var(--color-primary);
-}
-
-.breadcrumb-current {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.breadcrumb-separator {
-  color: var(--color-text-muted);
-  user-select: none;
-}
+.breadcrumb-current { color: var(--color-text); font-weight: 500; }
+.breadcrumb-separator { color: var(--color-text-muted); user-select: none; }
 
 /* ===== Main Layout ===== */
 .site-main {
@@ -800,16 +710,10 @@ body {
   width: 100%;
 }
 
-.seo-article {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
+.seo-article { display: flex; flex-direction: column; gap: 32px; }
 
 /* ===== Typography ===== */
-.article-header {
-  margin-bottom: 4px;
-}
+.article-header { margin-bottom: 4px; }
 
 .article-h1 {
   font-size: clamp(1.75rem, 4vw, 2.5rem);
@@ -834,25 +738,10 @@ body {
   margin-bottom: 16px;
 }
 
-h2 {
-  font-size: 1.375rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 12px;
-  letter-spacing: -0.01em;
-}
+h2 { font-size: 1.375rem; font-weight: 600; color: var(--color-text); margin-bottom: 12px; letter-spacing: -0.01em; }
+h3 { font-size: 1.125rem; font-weight: 600; color: var(--color-text); margin-bottom: 8px; }
 
-h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 8px;
-}
-
-p {
-  color: var(--color-text-secondary);
-  line-height: 1.7;
-}
+p { color: var(--color-text-secondary); line-height: 1.7; }
 
 /* ===== Font Changer Tool (CORE COMPONENT) ===== */
 .font-changer-tool {
@@ -863,27 +752,13 @@ p {
   box-shadow: var(--shadow-card);
 }
 
-.tool-header {
-  text-align: center;
-  margin-bottom: 20px;
-}
+.tool-header { text-align: center; margin-bottom: 20px; }
 
-.tool-header h2 {
-  font-size: 1.5rem;
-  color: var(--color-primary);
-  margin-bottom: 4px;
-}
+.tool-header h2 { font-size: 1.5rem; color: var(--color-primary); margin-bottom: 4px; }
 
-.tool-subtitle {
-  font-size: 0.9375rem;
-  color: var(--color-text-secondary);
-}
+.tool-subtitle { font-size: 0.9375rem; color: var(--color-text-secondary); }
 
-.tool-input-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 8px;
-}
+.tool-input-row { display: flex; gap: 12px; margin-bottom: 8px; }
 
 .font-input {
   flex: 1;
@@ -903,15 +778,9 @@ p {
   box-shadow: 0 0 0 3px rgba(0,212,170,0.15);
 }
 
-.font-input::placeholder {
-  color: var(--color-text-muted);
-}
+.font-input::placeholder { color: var(--color-text-muted); }
 
-.tool-input-actions {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
+.tool-input-actions { display: flex; gap: 8px; align-items: flex-start; }
 
 .btn-secondary {
   padding: 10px 18px;
@@ -947,19 +816,9 @@ p {
   gap: 8px;
 }
 
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-
-.btn-primary:active {
-  transform: scale(0.98);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
 .tool-result-meta {
   display: flex;
@@ -970,21 +829,9 @@ p {
   color: var(--color-text-muted);
 }
 
-.output-count {
-  font-weight: 600;
-  color: var(--color-primary);
-  font-size: 1rem;
-}
-
-.output-count-label {
-  color: var(--color-text-secondary);
-}
-
-.output-stats {
-  margin-left: auto;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
+.output-count { font-weight: 600; color: var(--color-primary); font-size: 1rem; }
+.output-count-label { color: var(--color-text-secondary); }
+.output-stats { margin-left: auto; color: var(--color-text-muted); font-size: 0.8125rem; }
 
 /* ===== Font Outputs ===== */
 .font-outputs {
@@ -998,18 +845,9 @@ p {
   scrollbar-color: var(--color-border) transparent;
 }
 
-.font-outputs::-webkit-scrollbar {
-  width: 6px;
-}
-
-.font-outputs::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.font-outputs::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
+.font-outputs::-webkit-scrollbar { width: 6px; }
+.font-outputs::-webkit-scrollbar-track { background: transparent; }
+.font-outputs::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
 
 .font-output-item {
   display: flex;
@@ -1022,21 +860,11 @@ p {
   transition: background 0.15s;
 }
 
-.font-output-item:hover {
-  background: rgba(48,43,99,0.6);
-}
+.font-output-item:hover { background: rgba(48,43,99,0.6); }
 
-.font-output-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.font-output-header { display: flex; justify-content: space-between; align-items: center; }
 
-.font-output-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-}
+.font-output-label { font-size: 0.8125rem; font-weight: 500; color: var(--color-text-secondary); }
 
 .copy-btn {
   display: inline-flex;
@@ -1066,12 +894,7 @@ p {
   background: rgba(0,212,170,0.12);
 }
 
-.copy-icon {
-  width: 14px;
-  height: 14px;
-  display: inline-block;
-  fill: currentColor;
-}
+.copy-icon { width: 14px; height: 14px; display: inline-block; fill: currentColor; }
 
 .font-output-text {
   font-size: 1rem;
@@ -1098,23 +921,9 @@ p {
   gap: 12px;
 }
 
-.tool-note {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  max-width: 300px;
-}
+.tool-note { font-size: 0.8125rem; color: var(--color-text-muted); max-width: 300px; }
 
 /* ===== Sections ===== */
-.how-it-works-section,
-.use-cases-section,
-.examples-section,
-.faq-section,
-.related-section,
-.related-pages-section,
-.attribute-info-section {
-  background: transparent;
-}
-
 .use-cases-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1133,9 +942,7 @@ p {
   transition: border-color 0.15s;
 }
 
-.use-case-card:hover {
-  border-color: var(--color-primary);
-}
+.use-case-card:hover { border-color: var(--color-primary); }
 
 .use-case-icon {
   width: 36px;
@@ -1151,23 +958,10 @@ p {
   flex-shrink: 0;
 }
 
-.use-case-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.use-case-info { display: flex; flex-direction: column; gap: 2px; }
 
-.use-case-label {
-  font-weight: 600;
-  color: var(--color-text);
-  font-size: 0.9375rem;
-}
-
-.use-case-desc {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  line-height: 1.4;
-}
+.use-case-label { font-weight: 600; color: var(--color-text); font-size: 0.9375rem; }
+.use-case-desc { font-size: 0.8125rem; color: var(--color-text-secondary); line-height: 1.4; }
 
 .examples-grid {
   display: grid;
@@ -1183,25 +977,10 @@ p {
   border-radius: var(--radius-md);
 }
 
-.example-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  margin-bottom: 4px;
-}
+.example-label { font-size: 0.8125rem; font-weight: 500; color: var(--color-text-muted); margin-bottom: 4px; }
+.example-styled { font-size: 0.9375rem; color: var(--color-primary); word-break: break-word; }
 
-.example-styled {
-  font-size: 0.9375rem;
-  color: var(--color-primary);
-  word-break: break-word;
-}
-
-.faq-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 8px;
-}
+.faq-list { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
 
 .faq-item {
   padding: 16px;
@@ -1210,25 +989,10 @@ p {
   border-radius: var(--radius-md);
 }
 
-.faq-question {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  margin-bottom: 6px;
-}
+.faq-question { font-size: 1rem; font-weight: 600; color: var(--color-primary); margin-bottom: 6px; }
+.faq-answer { font-size: 0.9375rem; color: var(--color-text-secondary); line-height: 1.6; }
 
-.faq-answer {
-  font-size: 0.9375rem;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-}
-
-.related-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
-}
+.related-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 
 .related-links a {
   padding: 8px 16px;
@@ -1242,17 +1006,9 @@ p {
   transition: all 0.15s;
 }
 
-.related-links a:hover {
-  border-color: var(--color-primary);
-  background: rgba(0,212,170,0.08);
-}
+.related-links a:hover { border-color: var(--color-primary); background: rgba(0,212,170,0.08); }
 
-.related-pages-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
+.related-pages-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
 .related-pages-links a {
   padding: 6px 12px;
@@ -1265,10 +1021,7 @@ p {
   transition: all 0.15s;
 }
 
-.related-pages-links a:hover {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
-}
+.related-pages-links a:hover { color: var(--color-primary); border-color: var(--color-primary); }
 
 /* ===== Footer ===== */
 .site-footer {
@@ -1286,26 +1039,12 @@ p {
   gap: 8px;
 }
 
-.footer-container p {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-}
+.footer-container p { font-size: 0.8125rem; color: var(--color-text-muted); }
 
-.footer-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
+.footer-nav { display: flex; flex-wrap: wrap; gap: 16px; }
 
-.footer-nav a {
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  font-size: 0.8125rem;
-}
-
-.footer-nav a:hover {
-  color: var(--color-primary);
-}
+.footer-nav a { color: var(--color-text-secondary); text-decoration: none; font-size: 0.8125rem; }
+.footer-nav a:hover { color: var(--color-primary); }
 
 /* ===== 404 ===== */
 .not-found-container {
@@ -1315,15 +1054,8 @@ p {
   padding: 40px;
 }
 
-.not-found-container h1 {
-  font-size: 2rem;
-  color: var(--color-primary);
-  margin-bottom: 12px;
-}
-
-.not-found-container p {
-  margin-bottom: 20px;
-}
+.not-found-container h1 { font-size: 2rem; color: var(--color-primary); margin-bottom: 12px; }
+.not-found-container p { margin-bottom: 20px; }
 
 .not-found-container code {
   background: var(--color-bg-card);
@@ -1331,10 +1063,6 @@ p {
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   color: var(--color-text-secondary);
-}
-
-.btn-primary {
-  display: inline-flex;
 }
 
 /* ===== Accessibility ===== */
